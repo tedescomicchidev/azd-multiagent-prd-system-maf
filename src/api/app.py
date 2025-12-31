@@ -4,9 +4,9 @@ from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException
 
-from .triage_workflow import (
+from .prd_workflow import (
     MissingEnvironmentError,
-    TriageWorkflow,
+    PrdWorkflow,
     WorkflowExecutionError,
     WorkflowNotReadyError,
     WorkflowResultError,
@@ -14,7 +14,7 @@ from .triage_workflow import (
 
 
 app = FastAPI()
-workflow = TriageWorkflow()
+workflow = PrdWorkflow()
 
 
 @app.on_event("startup")
@@ -35,14 +35,15 @@ async def health() -> dict[str, Any]:
     return {"status": "ok", **workflow.environment_snapshot()}
 
 
-@app.post("/triage")
-async def triage(ticket: str = Body(..., embed=True)) -> dict[str, Any]:
-    text = ticket.strip()
+@app.post("/prd")
+async def prd(feature_idea: str = Body(..., embed=True)) -> dict[str, Any]:
+    text = feature_idea.strip()
     if not text:
-        raise HTTPException(status_code=400, detail="Ticket content cannot be empty.")
+        raise HTTPException(status_code=400, detail="Feature idea cannot be empty.")
 
     try:
-        return await workflow.triage(text)
+        result, trace = await workflow.build_prd_with_trace(text)
+        return {"result": result, "trace": trace.messages}
     except WorkflowNotReadyError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (WorkflowExecutionError, WorkflowResultError, ValueError) as exc:

@@ -2,8 +2,12 @@ param location string = resourceGroup().location
 param prefix string = toLower('maf${uniqueString(resourceGroup().id)}')
 @description('Container image reference for the API service. Overridden by azd during deployment.')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-@description('Existing triage agent identifier to configure in the API container app.')
-param triageAgentId string = ''
+@description('Existing PRD Researcher agent identifier to configure in the API container app.')
+param prdResearcherAgentId string = ''
+@description('Existing PRD Strategy agent identifier to configure in the API container app.')
+param prdStrategyAgentId string = ''
+@description('Existing PRD Technical Architect agent identifier to configure in the API container app.')
+param prdTechArchAgentId string = ''
 
 module registry './modules/acr.bicep' = {
   name: 'registry'
@@ -28,7 +32,9 @@ module container './modules/containerapp.bicep' = {
     namePrefix: prefix
     containerImage: containerImage
     projectEndpoint: foundry.outputs.projectEndpoint
-    triageAgentId: triageAgentId
+    prdResearcherAgentId: prdResearcherAgentId
+    prdStrategyAgentId: prdStrategyAgentId
+    prdTechArchAgentId: prdTechArchAgentId
     registryServer: registry.outputs.loginServer
     registryName: registry.outputs.name
   }

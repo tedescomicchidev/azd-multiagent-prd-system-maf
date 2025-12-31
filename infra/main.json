@@ -24,11 +24,25 @@
         "description": "Container image reference for the API service. Overridden by azd during deployment."
       }
     },
-    "triageAgentId": {
+    "prdResearcherAgentId": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Existing triage agent identifier to configure in the API container app."
+        "description": "Existing PRD Researcher agent identifier to configure in the API container app."
+      }
+    },
+    "prdStrategyAgentId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PRD Strategy agent identifier to configure in the API container app."
+      }
+    },
+    "prdTechArchAgentId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing PRD Technical Architect agent identifier to configure in the API container app."
       }
     }
   },
@@ -315,8 +329,14 @@
           "projectEndpoint": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2022-09-01').outputs.projectEndpoint.value]"
           },
-          "triageAgentId": {
-            "value": "[parameters('triageAgentId')]"
+          "prdResearcherAgentId": {
+            "value": "[parameters('prdResearcherAgentId')]"
+          },
+          "prdStrategyAgentId": {
+            "value": "[parameters('prdStrategyAgentId')]"
+          },
+          "prdTechArchAgentId": {
+            "value": "[parameters('prdTechArchAgentId')]"
           },
           "registryServer": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'registry'), '2022-09-01').outputs.loginServer.value]"
@@ -352,11 +372,25 @@
             "projectEndpoint": {
               "type": "string"
             },
-            "triageAgentId": {
+            "prdResearcherAgentId": {
               "type": "string",
               "defaultValue": "",
               "metadata": {
-                "description": "Agent identifier used by the API to route triage requests."
+                "description": "PRD Researcher agent identifier used by the API."
+              }
+            },
+            "prdStrategyAgentId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "PRD Strategy agent identifier used by the API."
+              }
+            },
+            "prdTechArchAgentId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "PRD Technical Architect agent identifier used by the API."
               }
             },
             "serviceName": {
@@ -426,7 +460,7 @@
                     {
                       "name": "api",
                       "image": "[parameters('containerImage')]",
-                      "env": "[concat(createArray(createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-acr-id', parameters('namePrefix'))), '2018-11-30').clientId), createObject('name', 'AIFOUNDRY_PROJECT_ENDPOINT', 'value', parameters('projectEndpoint'))), if(empty(trim(parameters('triageAgentId'))), createArray(), createArray(createObject('name', 'TRIAGE_AGENT_ID', 'value', parameters('triageAgentId')))))]"
+                      "env": "[concat(createArray(createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-acr-id', parameters('namePrefix'))), '2018-11-30').clientId), createObject('name', 'AIFOUNDRY_PROJECT_ENDPOINT', 'value', parameters('projectEndpoint'))), if(empty(trim(parameters('prdResearcherAgentId'))), createArray(), createArray(createObject('name', 'PRD_RESEARCHER_AGENT_ID', 'value', parameters('prdResearcherAgentId')))), if(empty(trim(parameters('prdStrategyAgentId'))), createArray(), createArray(createObject('name', 'PRD_STRATEGY_AGENT_ID', 'value', parameters('prdStrategyAgentId')))), if(empty(trim(parameters('prdTechArchAgentId'))), createArray(), createArray(createObject('name', 'PRD_TECH_ARCH_AGENT_ID', 'value', parameters('prdTechArchAgentId')))))]"
                     }
                   ]
                 }

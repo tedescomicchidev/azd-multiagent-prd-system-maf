@@ -2,8 +2,14 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "triageAgentId": {
-      "value": "${TRIAGE_AGENT_ID}"
+    "prdResearcherAgentId": {
+      "value": "${PRD_RESEARCHER_AGENT_ID}"
+    },
+    "prdStrategyAgentId": {
+      "value": "${PRD_STRATEGY_AGENT_ID}"
+    },
+    "prdTechArchAgentId": {
+      "value": "${PRD_TECH_ARCH_AGENT_ID}"
     }
   }
 }

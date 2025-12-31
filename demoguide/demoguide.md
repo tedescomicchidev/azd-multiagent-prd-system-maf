@@ -1,6 +1,6 @@
 # Multi-Agent Demo Walkthrough
 
-This playbook contains the exact sequence to stand up, warm up, and present the Azure AI multi-agent triage solution during a live demo. Follow the numbered steps in order; each section calls out the commands to run, the story to tell, and the screenshot to show (when available).
+This playbook contains the exact sequence to stand up, warm up, and present the Azure AI multi-agent PRD workflow during a live demo. Follow the numbered steps in order; each section calls out the commands to run, the story to tell, and the screenshot to show (when available).
 
 ---
 
@@ -59,55 +59,49 @@ azd env get-values
 ## 3. Warm Up the Workflow (`bootstrap_agents.py`)
 
 ```pwsh
-python scripts/bootstrap_agents.py --ticket "VPN outage affecting finance team" --output warmup.json
+python scripts/bootstrap_agents.py --feature-idea "Add dark mode to our mobile app" --output warmup.json
 ```
 
 Narration points:
 
-- The script uses `src/api/triage_workflow.py` to instantiate the four agents (priority, team, effort, triage) in-process using the Microsoft Agent Framework.
+- The script uses `src/api/prd_workflow.py` to instantiate the three agents (Product Researcher, Product Strategy, Technical Architect) in-process using the Microsoft Agent Framework.
 - The tool waits for DNS propagation, resolves the Azure AI project endpoint/model deployment, and prints an environment snapshot so you can reassure the audience that everything is wired correctly.
-- Optional `--ticket` performs a full warm-up run and returns JSON for the aggregated triage result; `--output` saves the payload for later reference.
-- If you omit `--ticket`, the script exits after initialization—useful for quick health checks between takes.
+- Optional `--feature-idea` performs a full warm-up run and returns JSON for the aggregated PRD result; `--output` saves the payload for later reference.
+- If you omit `--feature-idea`, the script exits after initialization—useful for quick health checks between takes.
 - The console now prints the aggregated result plus each participant's contribution as compact, easy-to-read JSON; highlight how this makes it simple to narrate the workflow without post-processing the output.
-- If you notice stray internal spaces inside certain values (for example `"eff ort"`), call out that the script preserves the model's wording while only normalizing the layout.
 
-After the command finishes, open `warmup.json` in VS Code to show the structured JSON. Use `azd-multiagent-agents-in-ai-foundry.png` (Microsoft Foundry portal) to reinforce that the four agents are conceptually represented.
+After the command finishes, open `warmup.json` in VS Code to show the structured JSON. Use `azd-multiagent-agents-in-ai-foundry.png` (Microsoft Foundry portal) to reinforce that the agents are represented in the project.
 
 ---
 
-## 4. Exercise the Workflow End-to-End (`test_all_agents.py`)
+## 4. Exercise the Workflow End-to-End (`test_prd_workflow.py`)
 
 ```pwsh
-python scripts/test_all_agents.py --ticket "Teams chat is down for the engineering org"
+python scripts/test_prd_workflow.py --feature-idea "Add dark mode to our mobile app"
 ```
 
 Narration points:
 
-- `test_all_agents.py` automatically loads `.azure/<env>/.env`, mapping legacy names (`projectEndpoint`) to the new variables if necessary, so you do not need to export anything manually.
-- It sequentially runs each participant plus the triage aggregator and prints their responses with labels, making it the fastest way to confirm the full workflow during a demo.
-- All participant responses are rendered as normalized JSON blocks, so you can read priority/team/effort summaries directly from the terminal without wading through line-wrapped tokens.
-- Occasional internal spacing quirks originate from the model output itself; the script keeps the text semantically intact while trimming the surrounding whitespace.
+- `test_prd_workflow.py` automatically loads `.azure/<env>/.env`, mapping legacy names (`projectEndpoint`) to the new variables if necessary, so you do not need to export anything manually.
+- It sequentially runs each participant and prints their responses with labels, making it the fastest way to confirm the full workflow during a demo.
+- All participant responses are rendered as normalized JSON blocks, so you can read research/strategy/architecture summaries directly from the terminal without wading through line-wrapped tokens.
 - Mention that the script overwrites any stale environment variables detected in the current shell to avoid "agent not found" issues after redeployments.
 - Show `azd-multiagent-agents-responses.png` to visualize the console output structure.
 
 ---
 
-## 5. Inspect Individual Agents (`verify_agent.py`)
+## 5. Inspect a Full Run (`verify_agent.py`)
 
 ```pwsh
 python scripts/verify_agent.py `
-	--agent-id $Env:TRIAGE_AGENT_ID `
-	--ticket "VPN outage affecting finance team" `
-	--max-attempts 12 `
-	--initial-backoff 12 `
-	--max-backoff 60 `
-	--show-transcript
+	--feature-idea "Add dark mode to our mobile app" `
+	--show-trace
 ```
 
 Narration points:
 
-- Use this command if you want to spotlight retry/backoff behavior or show the transcript for a single agent. Swap `TRIAGE_AGENT_ID` for `PRIORITY_AGENT_ID`, `TEAM_AGENT_ID`, or `EFFORT_AGENT_ID` when troubleshooting.
-- The script logs run status transitions (`queued → running → completed`) and writes out the exchange if you pass `--show-transcript`.
+- Use this command if you want to spotlight the workflow transcript for a full run.
+- The script logs run status transitions (`queued → running → completed`) and writes out the exchange if you pass `--show-trace`.
 - Show `azd-multiagent-agents-running.png` to illustrate how the status output looks during a live run.
 
 ---
@@ -117,17 +111,17 @@ Narration points:
 The deployed container app exposes two endpoints:
 
 - `GET /` – health probe
-- `POST /triage` – accepts `{ "ticket": "..." }` and returns the aggregated JSON
+- `POST /prd` – accepts `{ "feature_idea": "..." }` and returns the aggregated PRD JSON plus step outputs
 
 Demonstrate the API using the `apiUrl` output:
 
 ```pwsh
 $base = (azd env get-value apiUrl)
 Invoke-RestMethod "$base/" -Method Get
-Invoke-RestMethod "$base/triage" -Method Post -Body (@{ ticket = "VPN outage affecting finance" } | ConvertTo-Json) -ContentType 'application/json'
+Invoke-RestMethod "$base/prd" -Method Post -Body (@{ feature_idea = "Add dark mode to our mobile app" } | ConvertTo-Json) -ContentType 'application/json'
 ```
 
-- Mention that the FastAPI app uses the same `TriageWorkflow` class under the hood, so the responses mirror what you saw in the scripts.
+- Mention that the FastAPI app uses the same `PrdWorkflow` class under the hood, so the responses mirror what you saw in the scripts.
 - Show `azd-multi-agent-output.png` if you want a slide-friendly depiction of the API response.
 
 ---
@@ -150,9 +144,9 @@ Work through the items in order if something breaks during a run:
 
 1. **Environment sanity** – `azd env get-values` and ensure the AI endpoint and model deployment variables are present.
 2. **Credential refresh** – run `azd auth login` or `az login` to refresh tokens before re-running scripts.
-3. **DNS propagation** – rerun `python scripts/bootstrap_agents.py` (without `--ticket`) and watch for the DNS wait loop message if the AI endpoint has not propagated yet.
+3. **DNS propagation** – rerun `python scripts/bootstrap_agents.py` (without `--feature-idea`) and watch for the DNS wait loop message if the AI endpoint has not propagated yet.
 4. **Agent recreation** – if `verify_agent.py` returns "No assistant found", rerun the bootstrap script to rebuild the workflow.
-5. **Rate limits** – increase `--max-attempts`/`--max-backoff` on the verification script or bump `modelSkuCapacity` in Bicep, then redeploy.
+5. **Rate limits** – bump `modelSkuCapacity` in Bicep and redeploy if you see frequent throttling.
 6. **Container diagnostics** – use Azure Monitor Logs to query `ContainerAppConsoleLogs_CL` for errors around the time of your run.
 
 Document any surprises during rehearsal so you can pre-empt them while presenting.
