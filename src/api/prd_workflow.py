@@ -11,6 +11,8 @@ from agent_framework import SequentialBuilder, WorkflowOutputEvent
 from agent_framework.azure import AzureAIAgentClient
 from azure.identity.aio import DefaultAzureCredential
 
+from .search_tool import SearchTool
+
 
 class MissingEnvironmentError(RuntimeError):
     """Raised when required Azure AI environment variables are absent."""
@@ -29,16 +31,15 @@ class WorkflowResultError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class TriageTrace:
+class PrdTrace:
     messages: dict[str, list[str]]
 
 
-class TriageWorkflow:
-    """Manages the triage workflow lifecycle for reuse across processes."""
+class PrdWorkflow:
+    """Manages the PRD workflow lifecycle for reuse across processes."""
 
     def __init__(self) -> None:
         self._stack: AsyncExitStack | None = None
-        self._client: AzureAIAgentClient | None = None
         self._workflow = None
         self._env_info: dict[str, str | None] | None = None
 
@@ -51,18 +52,32 @@ class TriageWorkflow:
         self._env_info = {
             "project_endpoint": project_endpoint,
             "model_deployment_name": model_deployment,
+            "prd_researcher_agent_id": os.getenv("PRD_RESEARCHER_AGENT_ID"),
+            "prd_strategy_agent_id": os.getenv("PRD_STRATEGY_AGENT_ID"),
+            "prd_tech_arch_agent_id": os.getenv("PRD_TECH_ARCH_AGENT_ID"),
         }
 
         self._stack = AsyncExitStack()
         credential = await self._stack.enter_async_context(DefaultAzureCredential())
-        self._client = await self._stack.enter_async_context(
-            AzureAIAgentClient(async_credential=credential)
-        )
 
+        search_tool = SearchTool()
         participants = []
         for spec in _PARTICIPANT_SPECS:
-            agent = await self._stack.enter_async_context(
-                self._client.create_agent(name=spec["name"], instructions=spec["instructions"])
+            agent_id = os.getenv(spec["env_var"])
+            client = await self._stack.enter_async_context(
+                AzureAIAgentClient(
+                    async_credential=credential,
+                    agent_id=agent_id,
+                    agent_name=spec["name"],
+                )
+            )
+            tools = None
+            if spec.get("uses_search"):
+                tools = [search_tool.as_function()]
+            agent = client.create_agent(
+                name=spec["name"],
+                instructions=spec["instructions"],
+                tools=tools,
             )
             participants.append(agent)
 
@@ -72,17 +87,16 @@ class TriageWorkflow:
         if self._stack is not None:
             await self._stack.aclose()
         self._stack = None
-        self._client = None
         self._workflow = None
         self._env_info = None
 
-    async def triage(self, ticket: str) -> dict[str, Any]:
-        result, _ = await self._run(ticket, capture_trace=False)
+    async def build_prd(self, feature_idea: str) -> dict[str, Any]:
+        result, _ = await self._run(feature_idea, capture_trace=True)
         return result
 
-    async def triage_with_trace(self, ticket: str) -> tuple[dict[str, Any], TriageTrace]:
-        result, trace = await self._run(ticket, capture_trace=True)
-        return result, TriageTrace(messages=trace)
+    async def build_prd_with_trace(self, feature_idea: str) -> tuple[dict[str, Any], PrdTrace]:
+        result, trace = await self._run(feature_idea, capture_trace=True)
+        return result, PrdTrace(messages=trace)
 
     def environment_snapshot(self) -> dict[str, str | None]:
         if self._env_info is not None:
@@ -91,18 +105,23 @@ class TriageWorkflow:
             "project_endpoint": os.getenv("AZURE_AI_PROJECT_ENDPOINT")
             or os.getenv("AIFOUNDRY_PROJECT_ENDPOINT"),
             "model_deployment_name": os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
-            or os.getenv("TRIAGE_MODEL_DEPLOYMENT_NAME"),
+            or os.getenv("PRD_MODEL_DEPLOYMENT_NAME"),
+            "prd_researcher_agent_id": os.getenv("PRD_RESEARCHER_AGENT_ID"),
+            "prd_strategy_agent_id": os.getenv("PRD_STRATEGY_AGENT_ID"),
+            "prd_tech_arch_agent_id": os.getenv("PRD_TECH_ARCH_AGENT_ID"),
         }
 
-    async def _run(self, ticket: str, *, capture_trace: bool) -> tuple[dict[str, Any], dict[str, list[str]]]:
+    async def _run(
+        self, feature_idea: str, *, capture_trace: bool
+    ) -> tuple[dict[str, Any], dict[str, list[str]]]:
         if self._workflow is None:
-            raise WorkflowNotReadyError("Call startup() before triage().")
+            raise WorkflowNotReadyError("Call startup() before build_prd().")
 
         trace: dict[str, list[str]] = {} if capture_trace else {}
         result: dict[str, Any] | None = None
 
         try:
-            async for event in self._workflow.run_stream(ticket):
+            async for event in self._workflow.run_stream(feature_idea):
                 executor_id = getattr(event, "executor_id", None)
                 if capture_trace and executor_id:
                     text = self._stringify_event_data(event)
@@ -119,7 +138,11 @@ class TriageWorkflow:
 
         if result is None:
             raise WorkflowResultError("Workflow completed without emitting a result.")
-        return result, trace
+
+        participant_outputs = self._extract_participant_outputs(trace)
+        composed = self._compose_prd(feature_idea, participant_outputs)
+        composed["workflow_output"] = result
+        return composed, trace
 
     @staticmethod
     def _resolve_project_endpoint() -> str:
@@ -139,12 +162,12 @@ class TriageWorkflow:
         deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
         if deployment:
             return deployment
-        legacy = os.getenv("TRIAGE_MODEL_DEPLOYMENT_NAME")
+        legacy = os.getenv("PRD_MODEL_DEPLOYMENT_NAME")
         if legacy:
             os.environ.setdefault("AZURE_AI_MODEL_DEPLOYMENT_NAME", legacy)
             return legacy
         raise MissingEnvironmentError(
-            "Set AZURE_AI_MODEL_DEPLOYMENT_NAME or TRIAGE_MODEL_DEPLOYMENT_NAME before starting the workflow."
+            "Set AZURE_AI_MODEL_DEPLOYMENT_NAME or PRD_MODEL_DEPLOYMENT_NAME before starting the workflow."
         )
 
     @staticmethod
@@ -155,7 +178,7 @@ class TriageWorkflow:
             samples: list[str] = []
             for item in payload:
                 try:
-                    return TriageWorkflow._extract_json(item)
+                    return PrdWorkflow._extract_json(item)
                 except ValueError:
                     content = getattr(item, "content", None)
                     text_attr = getattr(item, "text", None)
@@ -186,13 +209,11 @@ class TriageWorkflow:
                     for candidate in candidates:
                         samples.append(str(candidate)[:500])
                         try:
-                            return TriageWorkflow._extract_json(candidate)
+                            return PrdWorkflow._extract_json(candidate)
                         except ValueError:
                             continue
             hint = f" candidates={samples!r}" if samples else ""
-            raise ValueError(
-                f"No JSON object found in workflow output list: {payload!r}{hint}"
-            )
+            raise ValueError(f"No JSON object found in workflow output list: {payload!r}{hint}")
         if not isinstance(payload, str):
             raise ValueError(f"Unexpected payload type: {type(payload)!r}")
         cleaned = payload.strip()
@@ -214,7 +235,7 @@ class TriageWorkflow:
             normalized = normalized.replace('"\n', '"').replace('\n"', '"').replace("\n", " ")
             normalized = re.sub(r"\s+", " ", normalized).strip()
             try:
-                parsed = TriageWorkflow._extract_json(normalized)
+                parsed = PrdWorkflow._extract_json(normalized)
             except ValueError:
                 return normalized
             return json.dumps(parsed)
@@ -225,37 +246,90 @@ class TriageWorkflow:
                 return str(data)
         return str(data)
 
+    def _extract_participant_outputs(self, trace: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
+        outputs: dict[str, dict[str, Any]] = {}
+        for agent_name in _PARTICIPANT_ORDER:
+            messages = trace.get(agent_name)
+            if not messages:
+                outputs[agent_name] = {}
+                continue
+            parsed = self._parse_last_json(messages)
+            outputs[agent_name] = parsed or {}
+        return outputs
+
+    def _parse_last_json(self, messages: list[str]) -> dict[str, Any] | None:
+        for message in reversed(messages):
+            try:
+                return self._extract_json(message)
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _compose_prd(feature_idea: str, outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        research = outputs.get("product-researcher", {})
+        strategy = outputs.get("product-strategy", {})
+        architecture = outputs.get("technical-architect", {})
+
+        prd = {
+            "feature_idea": feature_idea,
+            "overview": research.get("research_summary"),
+            "personas": research.get("personas"),
+            "market_insights": research.get("market_insights"),
+            "competitive_analysis": research.get("competitive_analysis"),
+            "prd_outline": research.get("prd_outline"),
+            "vision": strategy.get("vision"),
+            "goals": strategy.get("goals"),
+            "non_goals": strategy.get("non_goals"),
+            "success_metrics": strategy.get("success_metrics"),
+            "strategic_alignment": strategy.get("strategic_alignment"),
+            "technical_feasibility": architecture.get("technical_feasibility"),
+            "recommended_approach": architecture.get("recommended_approach"),
+            "milestones": architecture.get("milestones"),
+            "risks_dependencies": architecture.get("risks_dependencies"),
+            "effort_estimate": architecture.get("effort_estimate"),
+        }
+
+        return {
+            "feature_idea": feature_idea,
+            "research": research,
+            "strategy": strategy,
+            "architecture": architecture,
+            "prd": prd,
+        }
+
 
 _PARTICIPANT_SPECS = [
     {
-        "name": "priority-analyst",
+        "name": "product-researcher",
+        "env_var": "PRD_RESEARCHER_AGENT_ID",
+        "uses_search": True,
         "instructions": (
-            "You are a support triage specialist. Analyze the user ticket and respond "
-            "with JSON containing `priority` (Critical, High, Medium, or Low) and `notes` "
-            "explaining the decision. Do not add extra text outside the JSON."
+            "You are a Product Researcher. Perform market and user research for the feature idea. "
+            "If helpful, call the SearchTool to gather evidence. Respond with JSON only using the keys: "
+            "`personas` (list), `market_insights` (string), `competitive_analysis` (string), "
+            "`research_summary` (string), `prd_outline` (list), and `sources` (list of objects with `title`, `url`)."
         ),
     },
     {
-        "name": "team-router",
+        "name": "product-strategy",
+        "env_var": "PRD_STRATEGY_AGENT_ID",
         "instructions": (
-            "You assign tickets to teams. Based on the conversation so far, respond "
-            "with JSON containing `team` (choose one of Platform, Integrations, Data, or "
-            "Support) and `notes` describing the reasoning. Do not add text outside the JSON payload."
+            "You are a Product Strategy Agent. Use the prior research output to craft product vision and strategy. "
+            "Respond with JSON only using the keys: `vision` (string), `goals` (list), `non_goals` (list), "
+            "`success_metrics` (list), `strategic_alignment` (string), and `assumptions` (list)."
         ),
     },
     {
-        "name": "effort-estimator",
+        "name": "technical-architect",
+        "env_var": "PRD_TECH_ARCH_AGENT_ID",
         "instructions": (
-            "Estimate the level of effort for the ticket. Reply with JSON containing `effort` "
-            "(S, M, or L where S is < 2 hours) and `notes` explaining your answer. Respond with JSON only."
-        ),
-    },
-    {
-        "name": "triage-aggregator",
-        "instructions": (
-            "Summarize the prior agent outputs into a single JSON object with keys `priority`, `team`, "
-            "`effort`, and `summary`. Use the previously provided JSON snippets to populate the fields. "
-            "Keep values concise and respond with JSON only."
+            "You are a Technical Architect. Evaluate feasibility and plan execution based on the prior outputs. "
+            "Respond with JSON only using the keys: `technical_feasibility` (string), "
+            "`recommended_approach` (string), `milestones` (list), `risks_dependencies` (list), "
+            "`effort_estimate` (string), and `architecture_notes` (string)."
         ),
     },
 ]
+
+_PARTICIPANT_ORDER = [spec["name"] for spec in _PARTICIPANT_SPECS]

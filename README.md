@@ -1,19 +1,18 @@
-# Building a Multi-Agent Support Triage System with AZD, Microsoft Agent Framework, and Microsoft Foundry
+# Building a Multi-Agent PRD Workflow with AZD, Microsoft Agent Framework, and Microsoft Foundry
 
-This repository provides a complete, end-to-end example of how to design, build, and deploy a production-ready multi-agent solution on Azure, leveraging the Microsoft Agent Framework and Microsoft Foundry resources.
+This repository provides a complete, end-to-end example of how to design, build, and deploy a production-ready PRD workflow on Azure, leveraging the Microsoft Agent Framework and Microsoft Foundry resources.
 
-We will recreate a ticket-triage system in which a primary agent delegates to three specialists: priority, team assignment, and effort estimation. Then, we will map it to a reference architecture and walk through deployment choices so you can ship it for real workloads.
+We will build a product requirements document (PRD) pipeline in which a sequential workflow runs three agents: Product Researcher, Product Strategy, and Technical Architect. Together they produce a structured PRD with research, strategy, and architectural guidance.
 
 This repository automates the scenario by provisioning Azure infrastructure with Bicep, deploying a FastAPI container to Azure Container Apps, and wiring the app to a multi-agent workflow in Microsoft Foundry.
 
-The solution coordinates four agents:
+The solution coordinates three agents:
 
 | Agent | Role | Output |
 |-------|------|--------|
-| Priority | Classifies urgency (High / Medium / Low) | e.g., “High” |
-| Team | Suggests the owning team | e.g., “Infra” |
-| Effort | Estimates delivery effort with supporting rationale | e.g., “Medium – provide remediation steps” |
-| Triage | Orchestrates the specialists to produce a consolidated ticket summary | e.g., “High priority • Infra • Medium effort” |
+| Product Researcher | Market & user research, personas, competitive analysis | Structured research output with PRD outline |
+| Product Strategy | Vision, goals/non-goals, success metrics | Product strategy decisions |
+| Technical Architect | Feasibility, approach, milestones, risks | Architecture recommendations and effort |
 
 The repository adds operational conveniences that go beyond the lab handout, including automated infrastructure deployment, repeatable agent bootstrapping, rate-limit-aware verification, and a consolidated test harness with readable JSON traces for demos.
 
@@ -24,26 +23,25 @@ The repository adds operational conveniences that go beyond the lab handout, inc
 ```
 Azure Resource Group (azd-multiagent)
 ├─ Azure Container Apps Environment
-│  └─ Container App (FastAPI triage API)
+│  └─ Container App (FastAPI PRD API)
 │     ├─ Managed Identity
 │     └─ Azure Container Registry image
 ├─ Azure Container Registry
 └─ Microsoft Foundry Project
 	├─ GPT-4o model deployment (capacity configurable)
 	├─ Project connection (AAD)
-	└─ Multi-agent graph (Priority, Team, Effort, Triage)
+	└─ Multi-agent workflow (Researcher → Strategy → Technical Architect)
 ```
 
 **Infrastructure as Code**: `infra/main.bicep` composes individual modules for the container app (`infra/modules/containerapp.bicep`), Microsoft Foundry resources (`infra/modules/foundry.bicep`), and container registry (`infra/modules/acr.bicep`).
 
-**Application**: `src/api/app.py` hosts FastAPI endpoints that expose the triage capability. Environment variables emitted by the Bicep deployment provide the AI project endpoint and agent IDs.
+**Application**: `src/api/app.py` hosts FastAPI endpoints that expose the PRD capability. Environment variables emitted by the Bicep deployment provide the AI project endpoint and agent IDs.
 
 **Automation scripts**:
 
-- `scripts/bootstrap_agents.py` – creates or refreshes the specialist + triage agents with the Microsoft Agent Framework and persists their IDs to the current `azd` environment.
-- `scripts/verify_agent.py` – verifies a single agent run with retry/backoff controls.
-- `scripts/test_all_agents.py` – runs all four agents in one command; automatically loads environment values from `.azure/<env>/.env` and emits normalized JSON blocks for each participant.
-- `scripts/bootstrap_agents.py` + `scripts/test_all_agents.py` supersede the manual Cloud Shell steps from the learning path.
+- `scripts/bootstrap_agents.py` – creates or refreshes the PRD agents with the Microsoft Agent Framework and persists their IDs to the current `azd` environment.
+- `scripts/verify_agent.py` – verifies a single PRD workflow run and optionally prints the trace.
+- `scripts/test_prd_workflow.py` – runs the three agents in sequence; automatically loads environment values from `.azure/<env>/.env` and emits normalized JSON blocks for each participant.
 
 ---
 
@@ -59,13 +57,15 @@ Azure Resource Group (azd-multiagent)
 │     └─ acr.bicep             # Azure Container Registry
 ├─ src/
 │  └─ api/
-│     ├─ app.py                # FastAPI app exposing triage API
+│     ├─ app.py                # FastAPI app exposing PRD API
+│     ├─ prd_workflow.py       # Sequential PRD workflow
+│     ├─ search_tool.py        # Optional Google Custom Search integration
 │     ├─ dockerfile            # Container image definition
 │     └─ requirements.txt      # API dependencies
 └─ scripts/
-	├─ bootstrap_agents.py      # Creates the four agents and stores IDs
-	├─ verify_agent.py          # Checks individual agent runs with retries
-	└─ test_all_agents.py       # Aggregated agent test harness
+	├─ bootstrap_agents.py      # Creates the three PRD agents and stores IDs
+	├─ verify_agent.py          # Checks PRD workflow runs with retries
+	└─ test_prd_workflow.py     # Aggregated PRD workflow test harness
 ```
 
 ---
@@ -111,69 +111,59 @@ At the end of the run, `azd` populates `.azure/<env>/.env` with output values in
 python scripts/bootstrap_agents.py
 ```
 
-This script waits for DNS propagation, creates the **priority**, **team**, **effort**, and **triage** agents, and saves their IDs to the current `azd` environment:
+This script waits for DNS propagation, creates the **product researcher**, **product strategy**, and **technical architect** agents, and saves their IDs to the current `azd` environment:
 
-- `PRIORITY_AGENT_ID`
-- `TEAM_AGENT_ID`
-- `EFFORT_AGENT_ID`
-- `TRIAGE_AGENT_ID`
+- `PRD_RESEARCHER_AGENT_ID`
+- `PRD_STRATEGY_AGENT_ID`
+- `PRD_TECH_ARCH_AGENT_ID`
 
-It also prints an environment snapshot and, when run with `--ticket`, writes the aggregated Microsoft Agent Framework response to `warmup.json` for easy sharing.
+It also prints an environment snapshot and, when run with `--feature-idea`, writes the aggregated PRD response to `warmup.json` for easy sharing.
 
-### 3. Test All Agents at Once
+### 3. Test the PRD Workflow
 
 ```pwsh
-python scripts/test_all_agents.py --ticket "VPN outage affecting finance team"
+python scripts/test_prd_workflow.py --feature-idea "Add dark mode to our mobile app"
 ```
 
-`test_all_agents.py` automatically loads `.azure/<env>/.env`, maps the `projectEndpoint` alias if necessary, and prints the response from each agent using the Microsoft Agent Framework runtime. Output is rendered as compact JSON blocks so you can narrate each participant’s decision without additional formatting. Pass `--env-file` to point at a different environment snapshot.
+`test_prd_workflow.py` automatically loads `.azure/<env>/.env`, maps the `projectEndpoint` alias if necessary, and prints the response from each agent using the Microsoft Agent Framework runtime. Output is rendered as compact JSON blocks so you can narrate each participant’s decision without additional formatting. Pass `--env-file` to point at a different environment snapshot.
 
 Example output:
 
 ```
-[PRIORITY]
-[MessageRole.AGENT] High
+[product-researcher]
+{ "personas": ["Nighttime power users", ...], ... }
 
-[TEAM]
-[MessageRole.AGENT] Infra ...
+[product-strategy]
+{ "vision": "...", "goals": ["..."], ... }
 
-[EFFORT]
-[MessageRole.AGENT] VPN outage remediation steps ...
-
-[TRIAGE]
-[MessageRole.AGENT] High priority • Infra • Moderate effort ...
+[technical-architect]
+{ "technical_feasibility": "...", "milestones": ["..."], ... }
 ```
 
-### 4. (Optional) Verify Individual Agents
+### 4. (Optional) Verify Workflow Execution
 
-To test a single agent with granular retry controls:
+To test a single workflow run with granular retry controls:
 
 ```pwsh
 python scripts/verify_agent.py `
-  --agent-id $Env:TRIAGE_AGENT_ID `
-  --ticket "VPN outage affecting finance team" `
-  --max-attempts 12 `
-  --initial-backoff 12 `
-  --max-backoff 60 `
-  --show-transcript
+  --feature-idea "Add dark mode to our mobile app" `
+  --show-trace
 ```
 
 Use this command when debugging rate-limit behaviour or inspecting transcripts in detail.
 
 ---
 
-## Alignment with the Lab Guide
+## Search Tool (Optional)
 
-The official instructions walk through four phases, each of which maps to automation in this repo:
+The Product Researcher can optionally call `SearchTool`, which integrates with Google Custom Search JSON API.
 
-| Lab Section | Manual Step | Repository Equivalent |
-|-------------|-------------|------------------------|
-| Create a Microsoft Foundry project | Portal-based project creation, GPT-4o deployment | `infra/modules/foundry.bicep` (deployed by `azd up`) |
-| Create an AI Agent client app – Prepare environment | Clone repo, set up Python environment | Included in this repo; no Cloud Shell setup needed |
-| Create AI agents | Manually edit `agent_triage.py` | `scripts/bootstrap_agents.py` & `scripts/test_all_agents.py` automate agent creation and testing |
-| Sign into Azure and run the app | Run `python agent_triage.py` interactively | FastAPI service + verification scripts provide automated and API-based execution |
+Set these environment variables to enable it:
 
-If you’re following the lab for certification prep, you can use this repository to accelerate the “build” phase, then compare outputs against the step-by-step guide.
+- `GOOGLE_SEARCH_API_KEY`
+- `GOOGLE_SEARCH_ENGINE_ID`
+
+If these are not configured, the tool returns a deterministic `search_not_configured` response and the workflow continues normally.
 
 ---
 
@@ -197,26 +187,3 @@ To remove all resources and avoid charges:
 ```pwsh
 azd down
 ```
-
-Alternatively, delete the resource group from the Azure portal (mirroring the “Clean up” section in the Microsoft Learn instructions).
-
----
-
-## Troubleshooting
-
-- **Rate limits**: Increase `modelSkuCapacity` in `infra/modules/foundry.bicep` or adjust retry flags (`--max-attempts`, `--initial-backoff`, `--max-backoff`) on the verification scripts.
-- **Agent not found**: Run `python scripts/bootstrap_agents.py` to refresh the agent IDs after redeployments or project resets.
-- **Environment variables missing**: Ensure `.azure/<env>/.env` exists. You can supply an explicit file with `--env-file`.
-- **Authentication errors**: Run `az login` and, if using managed identity locally, ensure you have access to the AI project.
-
----
-
-## Additional Resources
-
-- [Develop a multi-agent solution – Microsoft Learn lab](https://microsoftlearning.github.io/mslearn-ai-agents/Instructions/03b-build-multi-agent-solution.html)
-- [Microsoft Foundry SDK documentation](https://learn.microsoft.com/azure/ai-foundry/how-to/develop/sdk-overview)
-- [Microsoft Agent Framework overview](https://learn.microsoft.com/azure/ai-services/openai/how-to/agents-overview)
-- `demoguide/demoguide.md` – step-by-step presenter script with screenshots and troubleshooting tips.
-
-Feel free to extend the project with additional agents, integrate telemetry, or adapt the infrastructure modules for your organization’s deployment process.
-

@@ -3,8 +3,12 @@ param namePrefix string
 @description('Container image reference. Overridden by azd during deployment.')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param projectEndpoint string
-@description('Agent identifier used by the API to route triage requests.')
-param triageAgentId string = ''
+@description('PRD Researcher agent identifier used by the API.')
+param prdResearcherAgentId string = ''
+@description('PRD Strategy agent identifier used by the API.')
+param prdStrategyAgentId string = ''
+@description('PRD Technical Architect agent identifier used by the API.')
+param prdTechArchAgentId string = ''
 @description('Service name tag used by azd to discover the container app during deploy.')
 param serviceName string = 'api'
 @description('Azure Container Registry login server.')
@@ -64,12 +68,26 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           env: concat([
             { name: 'AZURE_CLIENT_ID', value: containerIdentity.properties.clientId }
             { name: 'AIFOUNDRY_PROJECT_ENDPOINT', value: projectEndpoint }
-          ], empty(trim(triageAgentId)) ? [] : [
-            {
-              name: 'TRIAGE_AGENT_ID'
-              value: triageAgentId
-            }
-          ])
+          ], concat(
+            empty(trim(prdResearcherAgentId)) ? [] : [
+              {
+                name: 'PRD_RESEARCHER_AGENT_ID'
+                value: prdResearcherAgentId
+              }
+            ],
+            empty(trim(prdStrategyAgentId)) ? [] : [
+              {
+                name: 'PRD_STRATEGY_AGENT_ID'
+                value: prdStrategyAgentId
+              }
+            ],
+            empty(trim(prdTechArchAgentId)) ? [] : [
+              {
+                name: 'PRD_TECH_ARCH_AGENT_ID'
+                value: prdTechArchAgentId
+              }
+            ]
+          ))
         }
       ]
     }

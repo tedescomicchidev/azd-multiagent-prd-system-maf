@@ -1,4 +1,4 @@
-"""Utility script to verify the triage workflow responds to a ticket."""
+"""Utility script to verify the PRD workflow responds to a feature idea."""
 from __future__ import annotations
 
 import argparse
@@ -13,9 +13,9 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 from typing import Optional
 
-from src.api.triage_workflow import (
+from src.api.prd_workflow import (
     MissingEnvironmentError,
-    TriageWorkflow,
+    PrdWorkflow,
     WorkflowExecutionError,
     WorkflowNotReadyError,
     WorkflowResultError,
@@ -93,7 +93,7 @@ def _initialize_env(explicit_path: Optional[str]) -> None:
             os.environ["AZURE_AI_PROJECT_ENDPOINT"] = legacy
 
     if "AZURE_AI_MODEL_DEPLOYMENT_NAME" not in os.environ:
-        legacy_model = os.environ.get("TRIAGE_MODEL_DEPLOYMENT_NAME") or os.environ.get(
+        legacy_model = os.environ.get("PRD_MODEL_DEPLOYMENT_NAME") or os.environ.get(
             "AIFOUNDRY_AGENT_MODEL"
         )
         if legacy_model:
@@ -101,8 +101,8 @@ def _initialize_env(explicit_path: Optional[str]) -> None:
             os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"] = legacy_model
 
 
-async def _run_verification(ticket: str, show_trace: bool) -> int:
-    workflow = TriageWorkflow()
+async def _run_verification(feature_idea: str, show_trace: bool) -> int:
+    workflow = PrdWorkflow()
     try:
         await workflow.startup()
     except MissingEnvironmentError as exc:
@@ -111,9 +111,9 @@ async def _run_verification(ticket: str, show_trace: bool) -> int:
 
     try:
         if show_trace:
-            result, trace = await workflow.triage_with_trace(ticket)
+            result, trace = await workflow.build_prd_with_trace(feature_idea)
         else:
-            result = await workflow.triage(ticket)
+            result = await workflow.build_prd(feature_idea)
             trace = None
     except (WorkflowNotReadyError, WorkflowExecutionError, WorkflowResultError) as exc:
         print(f"Workflow execution failed: {exc}", file=sys.stderr)
@@ -134,11 +134,11 @@ async def _run_verification(ticket: str, show_trace: bool) -> int:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Run the triage workflow against a sample ticket.")
+    parser = argparse.ArgumentParser(description="Run the PRD workflow against a sample feature idea.")
     parser.add_argument(
-        "--ticket",
-        default="VPN outage affecting finance team",
-        help="Ticket text to evaluate.",
+        "--feature-idea",
+        default="Add dark mode to our mobile app",
+        help="Feature idea to evaluate.",
     )
     parser.add_argument(
         "--env-file",
@@ -154,7 +154,7 @@ def main(argv: list[str]) -> int:
 
     _initialize_env(args.env_file)
 
-    return asyncio.run(_run_verification(ticket=args.ticket.strip(), show_trace=args.show_trace))
+    return asyncio.run(_run_verification(feature_idea=args.feature_idea.strip(), show_trace=args.show_trace))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,93 @@
 {
-  "priority": "Critical",
-  "notes": "The issue impacts the engineering organization, which could disrupt key workflows and productivity. Resolving communication outages should be prioritized immediately to mitigate operational delays."
+  "feature_idea": "Add dark mode to our mobile app",
+  "research": {
+    "personas": [
+      "Nighttime power users",
+      "Accessibility-focused users"
+    ],
+    "market_insights": "Users expect dark mode for comfort in low-light environments and battery savings on OLED screens.",
+    "competitive_analysis": "Most top productivity and social apps offer dark mode with auto-schedule support.",
+    "research_summary": "Dark mode is a baseline expectation for mobile UX; competitive parity and accessibility improvements are strong drivers.",
+    "prd_outline": [
+      "Problem statement",
+      "Target personas",
+      "Functional requirements",
+      "Non-functional requirements",
+      "Rollout plan"
+    ],
+    "sources": []
+  },
+  "strategy": {
+    "vision": "Deliver a comfortable, accessible viewing experience that improves retention and engagement.",
+    "goals": [
+      "Increase session duration",
+      "Improve accessibility satisfaction"
+    ],
+    "non_goals": [
+      "Rebranding the app UI"
+    ],
+    "success_metrics": [
+      "Dark mode adoption rate",
+      "App store review sentiment"
+    ],
+    "strategic_alignment": "Supports retention and accessibility roadmap initiatives.",
+    "assumptions": [
+      "Design tokens are in place"
+    ]
+  },
+  "architecture": {
+    "technical_feasibility": "Feasible with theme tokens and OS theme detection.",
+    "recommended_approach": "Implement theme tokens, add system preference detection, and provide manual toggle.",
+    "milestones": [
+      "Theme token audit",
+      "UI component updates",
+      "Beta rollout"
+    ],
+    "risks_dependencies": [
+      "Legacy components without theming support"
+    ],
+    "effort_estimate": "Medium (2-3 sprints)",
+    "architecture_notes": "Ensure contrast ratios and test across devices."
+  },
+  "prd": {
+    "feature_idea": "Add dark mode to our mobile app",
+    "overview": "Dark mode is a baseline expectation for mobile UX; competitive parity and accessibility improvements are strong drivers.",
+    "personas": [
+      "Nighttime power users",
+      "Accessibility-focused users"
+    ],
+    "market_insights": "Users expect dark mode for comfort in low-light environments and battery savings on OLED screens.",
+    "competitive_analysis": "Most top productivity and social apps offer dark mode with auto-schedule support.",
+    "prd_outline": [
+      "Problem statement",
+      "Target personas",
+      "Functional requirements",
+      "Non-functional requirements",
+      "Rollout plan"
+    ],
+    "vision": "Deliver a comfortable, accessible viewing experience that improves retention and engagement.",
+    "goals": [
+      "Increase session duration",
+      "Improve accessibility satisfaction"
+    ],
+    "non_goals": [
+      "Rebranding the app UI"
+    ],
+    "success_metrics": [
+      "Dark mode adoption rate",
+      "App store review sentiment"
+    ],
+    "strategic_alignment": "Supports retention and accessibility roadmap initiatives.",
+    "technical_feasibility": "Feasible with theme tokens and OS theme detection.",
+    "recommended_approach": "Implement theme tokens, add system preference detection, and provide manual toggle.",
+    "milestones": [
+      "Theme token audit",
+      "UI component updates",
+      "Beta rollout"
+    ],
+    "risks_dependencies": [
+      "Legacy components without theming support"
+    ],
+    "effort_estimate": "Medium (2-3 sprints)"
+  }
 }

@@ -11,13 +11,19 @@ from typing import Iterable
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.api.triage_workflow import (
+from src.api.prd_workflow import (
     MissingEnvironmentError,
-    TriageWorkflow,
+    PrdWorkflow,
     WorkflowExecutionError,
     WorkflowNotReadyError,
     WorkflowResultError,
 )
+
+try:
+    # Handle both `python scripts/...` and `python -m scripts...` invocation styles.
+    from scripts.verify_agent import _initialize_env  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback when executed as a script
+    from verify_agent import _initialize_env
 
 
 def _sanitize(value: object) -> object:
@@ -34,22 +40,16 @@ def _sanitize(value: object) -> object:
         return compact.strip()
     return value
 
-try:
-    # Handle both `python scripts/...` and `python -m scripts...` invocation styles.
-    from scripts.verify_agent import _initialize_env  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - fallback when executed as a script
-    from verify_agent import _initialize_env
 
-
-async def _execute(ticket: str) -> tuple[dict, list[tuple[str, list[str]]]]:
-    workflow = TriageWorkflow()
+async def _execute(feature_idea: str) -> tuple[dict, list[tuple[str, list[str]]]]:
+    workflow = PrdWorkflow()
     try:
         await workflow.startup()
     except MissingEnvironmentError as exc:
         raise RuntimeError(f"Missing environment configuration: {exc}") from exc
 
     try:
-        result, trace = await workflow.triage_with_trace(ticket)
+        result, trace = await workflow.build_prd_with_trace(feature_idea)
     except (WorkflowNotReadyError, WorkflowExecutionError, WorkflowResultError) as exc:
         raise RuntimeError(str(exc)) from exc
     finally:
@@ -61,8 +61,6 @@ async def _execute(ticket: str) -> tuple[dict, list[tuple[str, list[str]]]]:
 def _print_trace(trace_items: Iterable[tuple[str, list[str]]]) -> None:
     for executor_id, messages in trace_items:
         print(f"\n[{executor_id}]")
-        if executor_id == "priority-analyst":
-            print(messages)
         combined = " ".join(part.strip() for part in messages if part.strip())
         if not combined:
             continue
@@ -70,9 +68,7 @@ def _print_trace(trace_items: Iterable[tuple[str, list[str]]]) -> None:
         try:
             parsed = json.loads(combined)
         except json.JSONDecodeError:
-            normalized = (
-                combined.replace('" \n', '" ').replace('\n "', ' "').replace('\n', ' ')
-            )
+            normalized = combined.replace('" \n', '" ').replace('\n "', ' "').replace('\n', ' ')
             normalized = re.sub(r"\s+", " ", normalized).strip()
             for symbol in [",", ":", "{", "}", "[", "]"]:
                 normalized = normalized.replace(f" {symbol}", symbol).replace(f"{symbol} ", symbol)
@@ -87,11 +83,11 @@ def _print_trace(trace_items: Iterable[tuple[str, list[str]]]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the sequential triage workflow and inspect each step.")
+    parser = argparse.ArgumentParser(description="Run the PRD workflow and inspect each step.")
     parser.add_argument(
-        "--ticket",
-        default="VPN outage affecting finance team",
-        help="Ticket text to evaluate.",
+        "--feature-idea",
+        default="Add dark mode to our mobile app",
+        help="Feature idea to evaluate.",
     )
     parser.add_argument(
         "--env-file",
@@ -103,12 +99,12 @@ def main() -> int:
     _initialize_env(args.env_file)
 
     try:
-        result, trace_items = asyncio.run(_execute(args.ticket.strip()))
+        result, trace_items = asyncio.run(_execute(args.feature_idea.strip()))
     except RuntimeError as exc:
         print(f"Workflow execution failed: {exc}", file=sys.stderr)
         return 1
 
-    print("=== Aggregated triage result ===")
+    print("=== Final PRD output ===")
     print(json.dumps(_sanitize(result), indent=2))
 
     print("\n=== Participant outputs ===")
