@@ -1,93 +1,62 @@
 {
   "feature_idea": "Add dark mode to our mobile app",
-  "research": {
-    "personas": [
-      "Nighttime power users",
-      "Accessibility-focused users"
-    ],
-    "market_insights": "Users expect dark mode for comfort in low-light environments and battery savings on OLED screens.",
-    "competitive_analysis": "Most top productivity and social apps offer dark mode with auto-schedule support.",
-    "research_summary": "Dark mode is a baseline expectation for mobile UX; competitive parity and accessibility improvements are strong drivers.",
-    "prd_outline": [
-      "Problem statement",
-      "Target personas",
-      "Functional requirements",
-      "Non-functional requirements",
-      "Rollout plan"
-    ],
-    "sources": []
-  },
-  "strategy": {
-    "vision": "Deliver a comfortable, accessible viewing experience that improves retention and engagement.",
-    "goals": [
-      "Increase session duration",
-      "Improve accessibility satisfaction"
-    ],
-    "non_goals": [
-      "Rebranding the app UI"
-    ],
-    "success_metrics": [
-      "Dark mode adoption rate",
-      "App store review sentiment"
-    ],
-    "strategic_alignment": "Supports retention and accessibility roadmap initiatives.",
-    "assumptions": [
-      "Design tokens are in place"
-    ]
-  },
-  "architecture": {
-    "technical_feasibility": "Feasible with theme tokens and OS theme detection.",
-    "recommended_approach": "Implement theme tokens, add system preference detection, and provide manual toggle.",
-    "milestones": [
-      "Theme token audit",
-      "UI component updates",
-      "Beta rollout"
-    ],
-    "risks_dependencies": [
-      "Legacy components without theming support"
-    ],
-    "effort_estimate": "Medium (2-3 sprints)",
-    "architecture_notes": "Ensure contrast ratios and test across devices."
-  },
+  "research": {},
+  "strategy": {},
+  "architecture": {},
   "prd": {
     "feature_idea": "Add dark mode to our mobile app",
-    "overview": "Dark mode is a baseline expectation for mobile UX; competitive parity and accessibility improvements are strong drivers.",
+    "overview": null,
+    "personas": null,
+    "market_insights": null,
+    "competitive_analysis": null,
+    "prd_outline": null,
+    "vision": null,
+    "goals": null,
+    "non_goals": null,
+    "success_metrics": null,
+    "strategic_alignment": null,
+    "technical_feasibility": null,
+    "recommended_approach": null,
+    "milestones": null,
+    "risks_dependencies": null,
+    "effort_estimate": null
+  },
+  "workflow_output": {
     "personas": [
-      "Nighttime power users",
-      "Accessibility-focused users"
+      {
+        "name": "Tech-savvy users",
+        "description": "Users who spend significant time on their devices and are well-versed with technology, valuing features that enhance visual comfort and save battery life."
+      },
+      {
+        "name": "Night-mode enthusiasts",
+        "description": "Users who often interact with their devices in dark or low-light environments, making dark mode a critical feature for eye comfort."
+      },
+      {
+        "name": "Accessibility-focused users",
+        "description": "Individuals sensitive to bright screens or suffering from vision-related issues, seeking features that reduce strain on their eyes."
+      },
+      {
+        "name": "Battery-conscious users",
+        "description": "Users looking to optimize their device's battery life, especially on OLED screens where dark mode significantly reduces energy consumption."
+      }
     ],
-    "market_insights": "Users expect dark mode for comfort in low-light environments and battery savings on OLED screens.",
-    "competitive_analysis": "Most top productivity and social apps offer dark mode with auto-schedule support.",
+    "market_insights": "Implementing dark mode is becoming a standard for mobile apps due to increasing demand by users, especially those who use apps extensively in dark environments or during nighttime. Many mainstream apps have adopted dark mode to cater to user comfort and growing preferences.",
+    "competitive_analysis": "Competitors such as Instagram, Twitter, and WhatsApp have already integrated dark mode, leading to significant positive user feedback. Apps that lack this feature are often deemed outdated, potentially driving users to competitors.",
+    "research_summary": "Dark mode is not only a growing trend but also a requirement for modern apps due to user expectations. Benefits include reduced eye strain at night, improved readability, and energy efficiency on devices with OLED screens. Competitors who have incorporated dark mode have received overwhelmingly positive usage trends and user-focused reviews, indicating its importance.",
     "prd_outline": [
-      "Problem statement",
-      "Target personas",
-      "Functional requirements",
-      "Non-functional requirements",
-      "Rollout plan"
+      {
+        "feature": "Dark Mode Toggle",
+        "details": "Add an option in the app settings to toggle between light and dark mode."
+      },
+      {
+        "feature": "Auto Dark Mode",
+        "details": "Enable dark mode to activate automatically based on time of day or system preferences."
+      },
+      {
+        "feature": "Customizable Themes",
+        "details": "Provide additional customization, such as selecting different shades or colors for dark mode."
+      }
     ],
-    "vision": "Deliver a comfortable, accessible viewing experience that improves retention and engagement.",
-    "goals": [
-      "Increase session duration",
-      "Improve accessibility satisfaction"
-    ],
-    "non_goals": [
-      "Rebranding the app UI"
-    ],
-    "success_metrics": [
-      "Dark mode adoption rate",
-      "App store review sentiment"
-    ],
-    "strategic_alignment": "Supports retention and accessibility roadmap initiatives.",
-    "technical_feasibility": "Feasible with theme tokens and OS theme detection.",
-    "recommended_approach": "Implement theme tokens, add system preference detection, and provide manual toggle.",
-    "milestones": [
-      "Theme token audit",
-      "UI component updates",
-      "Beta rollout"
-    ],
-    "risks_dependencies": [
-      "Legacy components without theming support"
-    ],
-    "effort_estimate": "Medium (2-3 sprints)"
+    "sources": []
   }
 }

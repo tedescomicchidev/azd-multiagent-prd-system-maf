@@ -40,6 +40,7 @@ class PrdWorkflow:
 
     def __init__(self) -> None:
         self._stack: AsyncExitStack | None = None
+        self._client: AzureAIAgentClient | None = None
         self._workflow = None
         self._env_info: dict[str, str | None] | None = None
 
@@ -58,10 +59,16 @@ class PrdWorkflow:
         }
 
         self._stack = AsyncExitStack()
-        credential = await self._stack.enter_async_context(DefaultAzureCredential())
+        credential = await self._stack.enter_async_context(DefaultAzureCredential(
+            exclude_shared_token_cache_credential=True
+        ))
+        self._client = await self._stack.enter_async_context(
+            AzureAIAgentClient(credential=credential)
+        )
 
         search_tool = SearchTool()
         participants = []
+        '''
         for spec in _PARTICIPANT_SPECS:
             agent_id = os.getenv(spec["env_var"])
             client = await self._stack.enter_async_context(
@@ -80,6 +87,21 @@ class PrdWorkflow:
                 tools=tools,
             )
             participants.append(agent)
+        '''
+        for spec in _PARTICIPANT_SPECS:
+            tools = None
+            if spec.get("uses_search"):
+                tools = [search_tool.as_function()]
+            if tools==None:
+                agent = await self._stack.enter_async_context(
+                    self._client.create_agent(name=spec["name"], instructions=spec["instructions"])
+                )
+            else:
+                agent = await self._stack.enter_async_context(
+                    self._client.create_agent(name=spec["name"], instructions=spec["instructions"], tools=tools)
+                )
+                
+            participants.append(agent)
 
         self._workflow = SequentialBuilder().participants(participants).build()
 
@@ -87,11 +109,12 @@ class PrdWorkflow:
         if self._stack is not None:
             await self._stack.aclose()
         self._stack = None
+        self._client = None
         self._workflow = None
         self._env_info = None
 
     async def build_prd(self, feature_idea: str) -> dict[str, Any]:
-        result, _ = await self._run(feature_idea, capture_trace=True)
+        result, _ = await self._run(feature_idea, capture_trace=False)
         return result
 
     async def build_prd_with_trace(self, feature_idea: str) -> tuple[dict[str, Any], PrdTrace]:
@@ -254,7 +277,11 @@ class PrdWorkflow:
                 outputs[agent_name] = {}
                 continue
             parsed = self._parse_last_json(messages)
-            outputs[agent_name] = parsed or {}
+            if isinstance(parsed, dict):
+                outputs[agent_name] = parsed
+            else:
+                outputs[agent_name] = {}
+            
         return outputs
 
     def _parse_last_json(self, messages: list[str]) -> dict[str, Any] | None:
@@ -267,9 +294,10 @@ class PrdWorkflow:
 
     @staticmethod
     def _compose_prd(feature_idea: str, outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        research = outputs.get("product-researcher", {})
-        strategy = outputs.get("product-strategy", {})
-        architecture = outputs.get("technical-architect", {})
+        research = outputs.get("product-researcher") if isinstance(outputs.get("product-researcher"), dict) else {}
+        strategy = outputs.get("product-strategy") if isinstance(outputs.get("product-strategy"), dict) else {}
+        architecture = outputs.get("technical-architect") if isinstance(outputs.get("technical-architect"), dict) else {}
+
 
         prd = {
             "feature_idea": feature_idea,
