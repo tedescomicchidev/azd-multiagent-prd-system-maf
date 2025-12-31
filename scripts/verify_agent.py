@@ -1,4 +1,8 @@
-"""Utility script to verify the PRD workflow responds to a feature idea."""
+"""Utility script to verify the PRD workflow responds to a feature idea.
+
+Supports passing the feature idea either as plain text (--feature-idea) or as a Markdown file
+(--feature-idea-md). Optionally writes output to a file (--output-file).
+"""
 from __future__ import annotations
 
 import argparse
@@ -7,13 +11,13 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional, TextIO
 
 if __package__ in {None, ""}:
     # Ensure repository root is importable when running as a file path.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-from typing import Optional
 
-from src.api.prd_workflow import (
+from src.api.prd_workflow import (  # noqa: E402
     MissingEnvironmentError,
     PrdWorkflow,
     WorkflowExecutionError,
@@ -101,7 +105,37 @@ def _initialize_env(explicit_path: Optional[str]) -> None:
             os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"] = legacy_model
 
 
-async def _run_verification(feature_idea: str, show_trace: bool) -> int:
+def _read_markdown_file(path: str) -> str:
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Markdown file not found: {p}")
+    if not p.is_file():
+        raise OSError(f"Path is not a file: {p}")
+
+    # utf-8-sig handles UTF-8 BOMs gracefully (common on Windows).
+    text = p.read_text(encoding="utf-8-sig")
+
+    # Normalize newlines.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Trim edges only; keep markdown formatting intact.
+    return text.strip()
+
+
+def _write_trace(trace, stream: TextIO) -> None:
+    stream.write("\n--- Workflow trace ---\n")
+    for executor_id, messages in trace.messages.items():
+        stream.write(f"\n[{executor_id}]\n")
+        for message in messages:
+            stream.write(f"{message}\n")
+
+
+async def _run_verification(
+    feature_idea: str,
+    show_trace: bool,
+    output_file: Optional[str],
+    include_trace_in_output: bool,
+) -> int:
     workflow = PrdWorkflow()
     try:
         await workflow.startup()
@@ -121,25 +155,39 @@ async def _run_verification(feature_idea: str, show_trace: bool) -> int:
     finally:
         await workflow.shutdown()
 
-    print(json.dumps(result, indent=2))
+    payload = json.dumps(result, indent=2)
 
-    if trace is not None:
-        print("\n--- Workflow trace ---")
-        for executor_id, messages in trace.messages.items():
-            print(f"\n[{executor_id}]")
-            for message in messages:
-                print(message)
+    if output_file:
+        out_path = Path(output_file)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as f:
+            f.write(payload)
+            f.write("\n")
+            if include_trace_in_output and trace is not None:
+                _write_trace(trace, f)
+        print(f"Wrote output to {out_path}")
+    else:
+        print(payload)
+        if trace is not None:
+            _write_trace(trace, sys.stdout)
 
     return 0
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Run the PRD workflow against a sample feature idea.")
-    parser.add_argument(
+
+    idea_group = parser.add_mutually_exclusive_group()
+    idea_group.add_argument(
         "--feature-idea",
-        default="Add dark mode to our mobile app",
-        help="Feature idea to evaluate.",
+        default=None,
+        help="Feature idea to evaluate (plain text).",
     )
+    idea_group.add_argument(
+        "--feature-idea-md",
+        help="Path to a Markdown file containing the feature idea / context.",
+    )
+
     parser.add_argument(
         "--env-file",
         help="Optional path to an env file to load before verification.",
@@ -149,12 +197,45 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Print incremental outputs recorded during the workflow run.",
     )
+    parser.add_argument(
+        "--output-file",
+        help="If provided, write output JSON to this file instead of stdout.",
+    )
+    parser.add_argument(
+        "--include-trace-in-output",
+        action="store_true",
+        help="When --output-file is set and --show-trace is used, also write the trace to the output file.",
+    )
 
     args = parser.parse_args(argv)
 
     _initialize_env(args.env_file)
 
-    return asyncio.run(_run_verification(feature_idea=args.feature_idea.strip(), show_trace=args.show_trace))
+    if args.feature_idea_md:
+        try:
+            feature_idea = _read_markdown_file(args.feature_idea_md)
+        except OSError as exc:
+            print(f"Error reading markdown file: {exc}", file=sys.stderr)
+            return 2
+    else:
+        feature_idea = (args.feature_idea or "Add dark mode to our mobile app").strip()
+
+    if not feature_idea:
+        print(
+            "Error: feature idea is empty. Provide --feature-idea with non-empty text "
+            "or --feature-idea-md pointing to a non-empty markdown file.",
+            file=sys.stderr,
+        )
+        return 2
+
+    return asyncio.run(
+        _run_verification(
+            feature_idea=feature_idea,
+            show_trace=args.show_trace,
+            output_file=args.output_file,
+            include_trace_in_output=args.include_trace_in_output,
+        )
+    )
 
 
 if __name__ == "__main__":

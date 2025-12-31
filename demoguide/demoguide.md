@@ -97,6 +97,10 @@ python scripts/verify_agent.py `
 	--feature-idea "Add dark mode to our mobile app" `
 	--show-trace
 ```
+```pwsh
+python scripts/verify_agent.py --feature-idea "$ARCHITECTURE_DESCRIPTION" >> prd.md
+"$(cat ARCHITECTURE_DESCRIPTION)"
+```
 
 Narration points:
 
